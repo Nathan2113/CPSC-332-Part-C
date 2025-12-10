@@ -5,73 +5,86 @@ require __DIR__ . '/../includes/header.php';
 
 $pdo = db();
 
-// If ?id= is present, show detail page for a single movie
-$movieId = get_int($_GET, 'id');
+$movieId     = get_int($_GET, 'id');
+$mpaa        = get_string($_GET, 'rating');
+$format      = get_string($_GET, 'format');
+$theatreId   = get_int($_GET, 'theatre_id');
+$dateFilter  = get_string($_GET, 'date');
 
-if ($movieId !== null) {
-    $stmt = $pdo->prepare("
-        SELECT *
-        FROM Movie
-        WHERE MovieID = :id
-    ");
-    $stmt->execute([':id' => $movieId]);
-    $movie = $stmt->fetch();
+// Dropdown data
+$ratings = $pdo->query("SELECT DISTINCT MPAA FROM Movie WHERE MPAA IS NOT NULL ORDER BY MPAA")->fetchAll();
+$formats = $pdo->query("SELECT DISTINCT Format FROM Showtime WHERE Format IS NOT NULL ORDER BY Format")->fetchAll();
+$theatres = $pdo->query("SELECT TheatreID, TheatreName FROM Theatre ORDER BY TheatreName")->fetchAll();
+
+if ($movieId) {
+    // Detail view
+    $movieStmt = $pdo->prepare("SELECT MovieID, Title, MPAA, Language, Runtime, ReleaseDate FROM Movie WHERE MovieID = :id");
+    $movieStmt->execute([':id' => $movieId]);
+    $movie = $movieStmt->fetch();
 
     if (!$movie) {
-        echo "<h2>Movie not found</h2>";
-        echo '<p><a href="movies.php">&laquo; Back to list</a></p>';
+        echo "<p>Movie not found.</p>";
         require __DIR__ . '/../includes/footer.php';
         exit;
     }
 
-    echo "<h2>" . esc($movie['Title']) . "</h2>";
-    echo "<p>Rating: " . esc($movie['MPAA']) . "</p>";
-    echo "<p>Runtime: " . (int)$movie['Runtime'] . " minutes</p>";
-    echo "<p>Release Date: " . esc($movie['ReleaseDate']) . "</p>";
-
-    // Upcoming showtimes for this movie
-    $stmt = $pdo->prepare("
+    $showStmt = $pdo->prepare("
         SELECT s.ShowtimeID, s.StartTime, s.Format,
-               t.TheatreName, a.AuditoriumName
+               a.AuditoriumName, t.TheatreName
         FROM Showtime s
         JOIN Auditorium a ON s.AuditoriumID = a.AuditoriumID
         JOIN Theatre t ON a.TheatreID = t.TheatreID
         WHERE s.MovieID = :id
-          AND s.StartTime >= NOW()
         ORDER BY s.StartTime
     ");
-    $stmt->execute([':id' => $movieId]);
-    $shows = $stmt->fetchAll();
+    $showStmt->execute([':id' => $movieId]);
+    $showtimes = $showStmt->fetchAll();
+    ?>
 
-    if ($shows) {
-        echo "<h3>Upcoming Showtimes</h3>";
-        echo "<ul>";
-        foreach ($shows as $show) {
-            echo "<li>";
-            echo esc($show['StartTime']) . " (" . esc($show['Format']) . ") - ";
-            echo esc($show['TheatreName']) . " / " . esc($show['AuditoriumName']) . " ";
-            echo '<a href="seats.php?showtime_id=' . (int)$show['ShowtimeID'] . '">View Seats</a>';
-            echo "</li>";
-        }
-        echo "</ul>";
-    } else {
-        echo "<p>No upcoming showtimes for this movie.</p>";
-    }
+    <h2><?= esc($movie['Title']) ?></h2>
+    <p><strong>MPAA:</strong> <?= esc($movie['MPAA'] ?? 'NR') ?></p>
+    <p><strong>Language:</strong> <?= esc($movie['Language'] ?? 'N/A') ?></p>
+    <p><strong>Runtime:</strong> <?= esc($movie['Runtime'] ?? 'N/A') ?> min</p>
+    <p><strong>Release Date:</strong> <?= esc($movie['ReleaseDate'] ?? 'N/A') ?></p>
 
-    echo '<p><a href="movies.php">&laquo; Back to movie list</a></p>';
+    <h3>Showtimes</h3>
+    <?php if (!$showtimes): ?>
+        <p>No showtimes scheduled.</p>
+    <?php else: ?>
+        <table>
+            <tr>
+                <th>Time</th>
+                <th>Format</th>
+                <th>Theatre</th>
+                <th>Auditorium</th>
+                <th>Action</th>
+            </tr>
+            <?php foreach ($showtimes as $s): ?>
+                <tr>
+                    <td><?= esc($s['StartTime']) ?></td>
+                    <td><?= esc($s['Format']) ?></td>
+                    <td><?= esc($s['TheatreName']) ?></td>
+                    <td><?= esc($s['AuditoriumName']) ?></td>
+                    <td><a href="seats.php?showtime_id=<?= (int)$s['ShowtimeID'] ?>">View Seats</a></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    <?php endif; ?>
+
+    <p><a href="/movies.php">Back to movies</a></p>
+
+    <?php
     require __DIR__ . '/../includes/footer.php';
     exit;
 }
 
-// Otherwise: list view with optional filters
-$rating = get_string($_GET, 'rating');
-$format = get_string($_GET, 'format');
-$theatreId = get_int($_GET, 'theatre_id');
-$date = get_string($_GET, 'date');
-
+// List view with filters
 $params = [];
 $sql = "
-    SELECT DISTINCT m.MovieID, m.Title, m.MPAA, m.Runtime
+    SELECT m.MovieID,
+           m.Title,
+           m.MPAA,
+           GROUP_CONCAT(DISTINCT s.Format ORDER BY s.Format SEPARATOR ', ') AS Formats
     FROM Movie m
     LEFT JOIN Showtime s ON s.MovieID = m.MovieID
     LEFT JOIN Auditorium a ON s.AuditoriumID = a.AuditoriumID
@@ -79,9 +92,9 @@ $sql = "
     WHERE 1=1
 ";
 
-if ($rating) {
-    $sql .= " AND m.MPAA = :rating";
-    $params[':rating'] = $rating;
+if ($mpaa) {
+    $sql .= " AND m.MPAA = :mpaa";
+    $params[':mpaa'] = $mpaa;
 }
 if ($format) {
     $sql .= " AND s.Format = :format";
@@ -91,35 +104,45 @@ if ($theatreId) {
     $sql .= " AND t.TheatreID = :theatre_id";
     $params[':theatre_id'] = $theatreId;
 }
-if ($date) {
+if ($dateFilter) {
     $sql .= " AND DATE(s.StartTime) = :date";
-    $params[':date'] = $date;
+    $params[':date'] = $dateFilter;
 }
 
-$sql .= " ORDER BY m.Title";
+$sql .= "
+    GROUP BY m.MovieID, m.Title, m.MPAA
+    ORDER BY m.Title
+";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $movies = $stmt->fetchAll();
-
-// Need theatres list for dropdown
-$theatres = $pdo->query("
-    SELECT TheatreID, TheatreName
-    FROM Theatre
-    ORDER BY TheatreName
-")->fetchAll();
 ?>
 
 <h2>Browse Movies</h2>
 
 <form method="get">
     <label>
-        Rating:
-        <input type="text" name="rating" value="<?= esc($rating ?? '') ?>">
+        MPAA:
+        <select name="rating">
+            <option value="">-- any --</option>
+            <?php foreach ($ratings as $r): ?>
+                <option value="<?= esc($r['MPAA']) ?>" <?= $mpaa === $r['MPAA'] ? 'selected' : '' ?>>
+                    <?= esc($r['MPAA']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
     </label>
     <label>
         Format:
-        <input type="text" name="format" value="<?= esc($format ?? '') ?>">
+        <select name="format">
+            <option value="">-- any --</option>
+            <?php foreach ($formats as $f): ?>
+                <option value="<?= esc($f['Format']) ?>" <?= $format === $f['Format'] ? 'selected' : '' ?>>
+                    <?= esc($f['Format']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
     </label>
     <label>
         Theatre:
@@ -134,26 +157,23 @@ $theatres = $pdo->query("
     </label>
     <label>
         Date:
-        <input type="date" name="date" value="<?= esc($date ?? '') ?>">
+        <input type="date" name="date" value="<?= esc($dateFilter ?? '') ?>">
     </label>
     <button type="submit">Filter</button>
 </form>
 
 <?php if (!$movies): ?>
-    <p>No movies match your filters.</p>
+    <p>No movies match those filters.</p>
 <?php else: ?>
     <ul>
         <?php foreach ($movies as $m): ?>
             <li>
-                <a href="movies.php?id=<?= (int)$m['MovieID'] ?>">
-                    <?= esc($m['Title']) ?>
-                </a>
-                (<?= esc($m['MPAA']) ?>, <?= (int)$m['Runtime'] ?> min)
+                <a href="/movies.php?id=<?= (int)$m['MovieID'] ?>"><?= esc($m['Title']) ?></a>
+                <?php if ($m['MPAA']): ?> (<?= esc($m['MPAA']) ?>)<?php endif; ?>
+                <?php if ($m['Formats']): ?> - <?= esc($m['Formats']) ?><?php endif; ?>
             </li>
         <?php endforeach; ?>
     </ul>
 <?php endif; ?>
 
-<?php
-require __DIR__ . '/../includes/footer.php';
-
+<?php require __DIR__ . '/../includes/footer.php'; ?>

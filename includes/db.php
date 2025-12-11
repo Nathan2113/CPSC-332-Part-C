@@ -1,5 +1,4 @@
 <?php
-// includes/db.php
 
 function db(): PDO
 {

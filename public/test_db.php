@@ -14,6 +14,8 @@ try {
     $row2 = $pdo->query("SELECT COUNT(*) AS c FROM Showtime")->fetch();
     echo "Showtimes in DB: " . $row2['c'] . "\n";
 
+    require __DIR__ . '/../includes/functions.php';
+    echo "CSRF: " . esc(csrf_token());
 } catch (Throwable $e) {
     echo "ERROR:\n" . $e->getMessage() . "\n";
 }

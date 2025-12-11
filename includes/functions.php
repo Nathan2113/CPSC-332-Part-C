@@ -82,3 +82,19 @@ function redirect(string $url): void {
     exit;
 }
 
+/**
+ * Flash messages (store per type).
+ */
+function flash(string $type, string $message): void {
+    $_SESSION['flashes'][$type][] = $message;
+}
+
+/**
+ * Retrieve and clear flashes.
+ */
+function get_flashes(): array {
+    $flashes = $_SESSION['flashes'] ?? [];
+    unset($_SESSION['flashes']);
+    return $flashes;
+}
+

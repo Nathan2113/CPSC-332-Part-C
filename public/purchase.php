@@ -141,7 +141,9 @@ try {
     flash('success', 'Tickets purchased! A confirmation has been recorded.');
     redirect('/my_tickets.php?email=' . urlencode($customerEmail));
 } catch (Throwable $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     flash('error', 'Could not complete purchase: ' . $e->getMessage());
     redirect("/seats.php?showtime_id={$showtimeId}");
 }

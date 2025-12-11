@@ -1,0 +1,68 @@
+:root {
+  --bg: #0b1a2b;
+  --panel: #12263a;
+  --text: #f5f7fb;
+  --muted: #9cb3c9;
+  --accent: #4cc3ff;
+  --danger: #ff6b6b;
+  --success: #4cd964;
+  --border: #1f3a56;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header {
+  padding: 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+nav a { margin-right: 12px; font-weight: 600; }
+main { padding: 20px; }
+
+h1, h2, h3, h4 { margin: 0 0 12px; }
+
+form label { display: inline-block; margin-right: 12px; margin-bottom: 8px; }
+input, select, button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #0f2033;
+  color: var(--text);
+}
+button { background: var(--accent); color: #04101f; border: none; cursor: pointer; }
+button:hover { filter: brightness(1.05); }
+
+.flash-container { margin: 12px 0; }
+.flash { padding: 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border); }
+.flash.success { background: #0f2e1f; border-color: #1e6f4b; color: #b5f3d1; }
+.flash.error { background: #2f1515; border-color: #b03f3f; color: #f7c5c5; }
+.flash.info { background: #10253a; border-color: #2f6f9f; color: #c9e7ff; }
+
+.table, table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+th { background: #0f2033; }
+
+.seat-map { width: 100%; max-width: 720px; text-align: center; }
+.seat-map th { background: #0f2033; }
+.seat-map td { min-width: 50px; }
+.seat-map .available { background: #0f2e1f; }
+.seat-map .sold { background: #2f1515; color: #f7c5c5; }
+
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+
+footer {
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  margin-top: 20px;
+}
